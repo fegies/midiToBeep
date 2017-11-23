@@ -1,7 +1,6 @@
 module Main where
 
 import Codec.Midi
-import Text.Show.Pretty
 import Control.Arrow
 import Control.Monad
 import System.Environment
