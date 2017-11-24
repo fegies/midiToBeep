@@ -18,12 +18,12 @@ apL2 f [a,b] = f a b
 
 main :: IO ()
 main = do
-    input <- chunksOf 2 <$> getArgs
+    input <- getArgs
     let inputlength = length input
-    if inputlength == 0 || inputlength `mod` 2 /= 0 then
+    if inputlength == 0 || (inputlength `mod` 2) /= 0 then
         putStrLn "Usage: midiToBeep PAIRS OF MIDIFILE OUTPUTDIR"
     else
-        mapM_ (apL2 runMidi) input
+        mapM_ (apL2 runMidi) (chunksOf 2 input)
 
 runMidi :: FilePath -> FilePath -> IO ()
 runMidi input outdir = do
