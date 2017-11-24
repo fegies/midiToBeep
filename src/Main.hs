@@ -1,12 +1,11 @@
 module Main where
 
 import Codec.Midi
-import Control.Arrow
+import Control.Arrow(second)
 import Control.Monad
-import System.Environment
-import Data.Maybe
-import Data.List.Split
-import System.Directory
+import System.Environment(getArgs)
+import Data.List.Split(chunksOf)
+import System.Directory(createDirectoryIfMissing)
 
 
 nonempty [] = False
@@ -20,23 +19,30 @@ apL2 f [a,b] = f a b
 main :: IO ()
 main = do
     input <- chunksOf 2 <$> getArgs
-    mapM_ (apL2 runMidi) input
+    let inputlength = length input
+    if inputlength == 0 || inputlength `mod` 2 /= 0 then
+        putStrLn "Usage: midiToBeep PAIRS OF MIDIFILE OUTPUTDIR"
+    else
+        mapM_ (apL2 runMidi) input
 
 runMidi :: FilePath -> FilePath -> IO ()
 runMidi input outdir = do
+    createDirectoryIfMissing False outdir
     (Midi fileType timediff tracks) <- fromRight (error $ "error parsing " ++ input) <$> importFile input
+    let cleanedtracks = filter nonempty $ map (notesOff . filterNotes) tracks
     let generateOutput tracknum track = zipWithM_ writeTrack [1..] splittracks
             where
             splittracks = map (toBeepString . toBeepList . toRealTime timediff) . splitTrack $ track
             writeTrack agentnum = writeFile (outdir ++ "/track_" ++ show tracknum ++ "_agent_" ++ show agentnum ++ ".sh" )
-    let cleanedtracks = filter nonempty $ map (notesOff . filterNotes) tracks
-    createDirectoryIfMissing False outdir
     zipWithM_ generateOutput [1..] cleanedtracks
         
 
 toBeepString :: [(Time,Maybe Frequency)] -> String
-toBeepString = foldr (\f s -> s ++ toArgs f) "beep" where
-    toArgs (t,f) = " -nf " ++ show (fromMaybe 0 f) ++ " -l " ++ show (t * 1000)
+toBeepString l = "beep" ++ concatMap toArgs l  where
+    toArgs (t,mf) = case mf of
+        Nothing -> " -D " ++ time
+        Just f -> " -nf " ++ show f ++ " -l " ++ time
+        where time = show (round $ t * 1000 :: Int)
 
 --turns NoteOn with a velocity of 0 to NoteOff commands, makes processing easier
 notesOff :: Track a -> Track a
