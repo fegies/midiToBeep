@@ -1,15 +1,15 @@
 module Main where
 
 import Codec.Midi
-import Control.Arrow(second)
-import Control.Monad
-import System.Environment(getArgs)
-import Data.List.Split(chunksOf)
-import System.Directory(createDirectoryIfMissing)
+import Control.Arrow      (second)
+import Control.Monad      (zipWithM_)
+import Data.List.Split    (chunksOf)
+import System.Directory   (createDirectoryIfMissing)
+import System.Environment (getArgs)
 
 
 nonempty [] = False
-nonempty _ = True
+nonempty _  = True
 
 keyToHertz :: Int -> Frequency
 keyToHertz key = 2**((fromIntegral key-69)/12) * 440
@@ -35,20 +35,20 @@ runMidi input outdir = do
             splittracks = map (toBeepString . toBeepList . toRealTime timediff) . splitTrack $ track
             writeTrack agentnum = writeFile (outdir ++ "/track_" ++ show tracknum ++ "_agent_" ++ show agentnum ++ ".sh" )
     zipWithM_ generateOutput [1..] cleanedtracks
-        
+
 
 toBeepString :: [(Time,Maybe Frequency)] -> String
 toBeepString l = "beep" ++ concatMap toArgs l  where
     toArgs (t,mf) = case mf of
         Nothing -> " -D " ++ time
-        Just f -> " -nf " ++ show f ++ " -l " ++ time
+        Just f  -> " -nf " ++ show f ++ " -l " ++ time
         where time = show (round $ t * 1000 :: Int)
 
 --turns NoteOn with a velocity of 0 to NoteOff commands, makes processing easier
 notesOff :: Track a -> Track a
 notesOff = map (second analyseNote) where
     analyseNote (NoteOn chan key 0) = NoteOff chan key 0
-    analyseNote a = a
+    analyseNote a                   = a
 
 --removes all midi events that are not note events
 filterNotes :: Track a -> Track a
@@ -56,7 +56,7 @@ filterNotes = filter (isNoteControl . snd) where
     isNoteControl a = isNoteOn a || isNoteOff a
 
 fromRight :: b -> Either a b -> b
-fromRight a (Left _) = a
+fromRight a (Left _)  = a
 fromRight _ (Right a) = a
 
 type Frequency = Double
@@ -75,14 +75,14 @@ splitTrack :: Num a => Track a -> [Track a]
 splitTrack = map (fromAbsTime . reverse) . takeWhile nonempty . map snd . runsplit initialAgents . toAbsTime where
 
     runsplit :: [Agent a] -> [(a,Message)] -> [Agent a]
-    runsplit agents [] = agents
-    runsplit agents (m@(_,NoteOn{}):xs) = runsplit (setNote agents m) xs
+    runsplit agents []                   = agents
+    runsplit agents (m@(_,NoteOn{}):xs)  = runsplit (setNote agents m) xs
     runsplit agents (m@(_,NoteOff{}):xs) = runsplit (unsetNote agents m) xs
-    runsplit agents (_:xs) = runsplit agents xs
+    runsplit agents (_:xs)               = runsplit agents xs
 
     setNote :: [Agent a] -> (a,Message) -> [Agent a]
     setNote ((Nothing, al) : as) m@(_,NoteOn _ k _) = (Just k,m:al) : as
-    setNote (a@(Just _,_) : as) m = a:setNote as m
+    setNote (a@(Just _,_) : as) m                   = a:setNote as m
 
     unsetNote :: [Agent a] -> (a,Message) -> [Agent a]
     unsetNote (a@(Nothing, _):as) m = a : unsetNote as m
