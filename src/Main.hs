@@ -2,7 +2,7 @@ module Main where
 
 import Codec.Midi
 import Control.Arrow      (second)
-import Control.Monad      (zipWithM_)
+import Control.Monad      (zipWithM_,unless)
 import Data.List.Split    (chunksOf)
 import System.Directory   (createDirectoryIfMissing)
 import System.Environment (getArgs)
@@ -18,17 +18,28 @@ apL2 f [a,b] = f a b
 
 main :: IO ()
 main = do
-    input <- getArgs
-    let inputlength = length input
-    if inputlength == 0 || (inputlength `mod` 2) /= 0 then
-        putStrLn "Usage: midiToBeep PAIRS OF MIDIFILE OUTPUTDIR"
-    else
-        mapM_ (apL2 runMidi) (chunksOf 2 input)
+    opts <- getArgs >>= parseOptions
+    unless (inputFile opts == "" || outputDir opts == "") $ 
+        runMidi (inputFile opts) (outputDir opts) (mergeTracks opts)
 
-runMidi :: FilePath -> FilePath -> IO ()
-runMidi input outdir = do
+data Options = Options {
+    mergeTracks :: Bool,
+    inputFile :: FilePath,
+    outputDir :: FilePath
+}
+
+parseOptions :: [String] -> IO Options
+parseOptions = parseOptions' $ Options False "" "" where
+    parseOptions' o [] = return o
+    parseOptions' o ("-m":xs) = parseOptions' ( o {mergeTracks=True} ) xs
+    parseOptions' o (i:od:[]) = return $ o {inputFile=i, outputDir=od}
+    parseOptions' _ _ = putStrLn "Usage: midiToBeep [Flags] MIDIFILE OUTPUTDIR" >> return (Options False "" "")
+
+runMidi :: FilePath -> FilePath -> Bool -> IO ()
+runMidi input outdir mergeTracks = do
     createDirectoryIfMissing False outdir
-    (Midi fileType timediff tracks) <- fromRight (error $ "error parsing " ++ input) <$> importFile input
+    midi <- fromRight (error $ "error parsing " ++ input) <$> importFile input
+    let (Midi fileType timediff tracks) = if mergeTracks then toSingleTrack midi else midi
     let cleanedtracks = filter nonempty $ map (notesOff . filterNotes) tracks
     let generateOutput tracknum track = zipWithM_ writeTrack [1..] splittracks
             where
