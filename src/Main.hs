@@ -30,9 +30,8 @@ data Options = Options {
 
 parseOptions :: [String] -> IO Options
 parseOptions = parseOptions' $ Options False "" "" where
-    parseOptions' o [] = return o
     parseOptions' o ("-m":xs) = parseOptions' ( o {mergeTracks=True} ) xs
-    parseOptions' o (i:od:[]) = return $ o {inputFile=i, outputDir=od}
+    parseOptions' o [i,od] = return $ o {inputFile=i, outputDir=od}
     parseOptions' _ _ = putStrLn "Usage: midiToBeep [Flags] MIDIFILE OUTPUTDIR" >> return (Options False "" "")
 
 runMidi :: FilePath -> FilePath -> Bool -> IO ()
